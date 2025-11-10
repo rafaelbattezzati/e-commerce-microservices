@@ -6,6 +6,8 @@ import com.rbattezzati.ecommerce.kafka.OrderConfirmation;
 import com.rbattezzati.ecommerce.kafka.OrderProducer;
 import com.rbattezzati.ecommerce.orderline.OrderLineRequest;
 import com.rbattezzati.ecommerce.orderline.OrderLineService;
+import com.rbattezzati.ecommerce.payment.PaymentClient;
+import com.rbattezzati.ecommerce.payment.PaymentRequest;
 import com.rbattezzati.ecommerce.product.ProductClient;
 import com.rbattezzati.ecommerce.product.PurchaseRequest;
 import jakarta.persistence.EntityNotFoundException;
@@ -13,7 +15,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
-import java.util.stream.Collector;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,6 +27,7 @@ public class OrderService {
     private final OrderMapper mapper;
     private final OrderLineService orderLineService;
     private final OrderProducer orderProducer;
+    private final PaymentClient paymentClient;
 
     public Integer createOrder(OrderRequest request){
         //check the customer -> OpenFeign
@@ -51,6 +53,14 @@ public class OrderService {
         }
 
         //start payment process
+        var paymentRequest = new PaymentRequest(
+                request.amount(),
+                request.paymentMethod(),
+                order.getId(),
+                order.getReference(),
+                customer
+        );
+        paymentClient.requestOrderPayment(paymentRequest);
 
         //send the order confirmation  --> notification-service (kafka)
         orderProducer.sendOrderConfirmation(
